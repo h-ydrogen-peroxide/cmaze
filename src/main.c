@@ -24,7 +24,7 @@ typedef struct {
 } Tiles;
 
 typedef enum {
-        UP,
+        UP = 1,
         RIGHT,
         DOWN,
         LEFT,
@@ -278,36 +278,36 @@ void render3d(Tiles *relative, GameData *gameData) {
         }
 }
 
-int processInput(int arrayWidth, int arrayHeight, int array[][arrayWidth], Tiles *relative, GameData *gameData) {
+int processInput(int arrayWidth, int arrayHeight, int array[][arrayWidth], Tiles *relative, GameData *gameData, bool btnLeftAction, bool btnRightAction, bool btnUpAction, bool btnDownAction, bool btnEditAction, bool btnDarkModeAction, bool btn3dAction) {
         int posX = gameData->posX;
         int posY = gameData->posY;
 
         // Keyboard toggles
-        if (IsKeyPressed(KEY_ONE)) {
+        if (IsKeyPressed(KEY_ONE) || btnEditAction) {
                 toggle(&(gameData->editMode));
         }
-        else if (IsKeyPressed(KEY_TWO)) {
+        else if (IsKeyPressed(KEY_TWO) || btnDarkModeAction) {
                 toggle(&(gameData->darkMode));
         }
-        else if (IsKeyPressed(KEY_THREE)) {
+        else if (IsKeyPressed(KEY_THREE) || btn3dAction) {
                 toggle(&(gameData->runIn3d));
         }
         else if (IsKeyPressed(KEY_FOUR)) {
                 toggle(&(gameData->showFPS));
         }
 
-        else if (IsKeyPressed(KEY_V) || (gameData->runIn3d && IsKeyPressed(KEY_LEFT))) {
+        else if (IsKeyPressed(KEY_V) || (gameData->runIn3d && (IsKeyPressed(KEY_LEFT) || btnLeftAction))) {
                 if (gameData->dir == UP)
                         gameData->dir = LEFT;
                 else
                         gameData->dir--;
         }
-        else if (IsKeyPressed(KEY_B) || (gameData->runIn3d && IsKeyPressed(KEY_RIGHT))) {
+        else if (IsKeyPressed(KEY_B) || (gameData->runIn3d && (IsKeyPressed(KEY_RIGHT) || btnRightAction))) {
                 gameData->dir++;
                 gameData->dir %= LEFT + 1;
         }
 
-        else if (IsKeyPressed(KEY_LEFT)) {
+        else if (IsKeyPressed(KEY_LEFT) || (!gameData->runIn3d && btnLeftAction)) {
                 if (relative->left == 0 || (gameData->editMode && relative->left != 2)) {
                         switch (gameData->dir) {
                         case LEFT:
@@ -325,7 +325,7 @@ int processInput(int arrayWidth, int arrayHeight, int array[][arrayWidth], Tiles
                         }
                 }
         }
-        else if (IsKeyPressed(KEY_RIGHT)) {
+        else if (IsKeyPressed(KEY_RIGHT) || (!gameData->runIn3d && btnRightAction)) {
                 if (relative->right == 0 || (gameData->editMode && relative->right != 2)) {
                         switch (gameData->dir) {
                         case LEFT:
@@ -343,7 +343,7 @@ int processInput(int arrayWidth, int arrayHeight, int array[][arrayWidth], Tiles
                         }
                 }
         }
-        else if (IsKeyPressed(KEY_UP)) {
+        else if (IsKeyPressed(KEY_UP) || btnUpAction) {
                 if (relative->up == 0 || (gameData->editMode && relative->up != 2)) {
                         switch (gameData->dir) {
                         case LEFT:
@@ -361,7 +361,7 @@ int processInput(int arrayWidth, int arrayHeight, int array[][arrayWidth], Tiles
                         }
                 }
         }
-        else if (IsKeyPressed(KEY_DOWN)) {
+        else if (IsKeyPressed(KEY_DOWN) || btnDownAction) {
                 if (relative->down == 0 || (gameData->editMode && relative->down != 2)) {
                         switch (gameData->dir) {
                         case LEFT:
@@ -532,6 +532,13 @@ int processInput(int arrayWidth, int arrayHeight, int array[][arrayWidth], Tiles
         return 0;
 }
 
+bool checkButtonPressed(Rectangle *rect) {
+        if (CheckCollisionPointRec(GetMousePosition(), *rect) && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+                return true;
+
+        return false;
+}
+
 int run(GameData *gameData, WindowConfig *windowData, int arrayWidth, int arrayHeight, int array[][arrayWidth]) {
         Tiles tiles;
         tiles.center = tiles.left = tiles.right = tiles.up = tiles.down = tiles.upLeft = tiles.upRight = tiles.downLeft = tiles.downRight = 0;
@@ -541,7 +548,31 @@ int run(GameData *gameData, WindowConfig *windowData, int arrayWidth, int arrayH
         Tiles relative;
         pointInDirection(gameData->dir, &(tiles), &(relative));
 
-        if (processInput(arrayWidth, arrayHeight, array, &(relative), gameData) != 0)
+        int buttonMargin = 10;
+        int buttonLength = 50;
+
+        Rectangle btnLeft = { buttonMargin, gameData->screenHeight - buttonMargin - buttonLength, buttonLength, buttonLength };
+        bool btnLeftAction = checkButtonPressed(&btnLeft);
+
+        Rectangle btnRight = { buttonMargin * 3 + buttonLength * 2, gameData->screenHeight - buttonMargin - buttonLength, buttonLength, buttonLength };
+        bool btnRightAction = checkButtonPressed(&btnRight);
+
+        Rectangle btnUp = { buttonMargin * 2 + buttonLength, gameData->screenHeight - buttonMargin * 2 - buttonLength * 2, buttonLength, buttonLength };
+        bool btnUpAction = checkButtonPressed(&btnUp);
+
+        Rectangle btnDown = { buttonMargin * 2 + buttonLength, gameData->screenHeight - buttonMargin - buttonLength, buttonLength, buttonLength };
+        bool btnDownAction = checkButtonPressed(&btnDown);
+
+        Rectangle btnEdit = { gameData->screenWidth - buttonMargin * 3 - buttonLength * 3, gameData->screenHeight - buttonMargin - buttonLength, buttonLength, buttonLength };
+        bool btnEditAction = checkButtonPressed(&btnEdit);
+
+        Rectangle btnDarkMode = { gameData->screenWidth - buttonMargin * 2 - buttonLength * 2, gameData->screenHeight - buttonMargin - buttonLength, buttonLength, buttonLength };
+        bool btnDarkModeAction = checkButtonPressed(&btnDarkMode);
+
+        Rectangle btn3d = { gameData->screenWidth - buttonMargin - buttonLength, gameData->screenHeight - buttonMargin - buttonLength, buttonLength, buttonLength };
+        bool btn3dAction = checkButtonPressed(&btn3d);
+
+        if (processInput(arrayWidth, arrayHeight, array, &(relative), gameData, btnLeftAction, btnRightAction, btnUpAction, btnDownAction, btnEditAction, btnDarkModeAction, btn3dAction) != 0)
                 return -1; // Go back to main menu
 
         BeginDrawing();
@@ -550,9 +581,20 @@ int run(GameData *gameData, WindowConfig *windowData, int arrayWidth, int arrayH
                 else
                         render2d(&(relative), gameData);
 
+                Color textColor = getDarkModeTextColor(gameData->darkMode);
+
+                // Buttons
+                DrawRectangleLines(btnLeft.x, btnLeft.y, buttonLength, buttonLength, textColor);
+                DrawRectangleLines(btnRight.x, btnRight.y, buttonLength, buttonLength, textColor);
+                DrawRectangleLines(btnUp.x, btnUp.y, buttonLength, buttonLength, textColor);
+                DrawRectangleLines(btnDown.x, btnDown.y, buttonLength, buttonLength, textColor);
+
+                DrawRectangleLines(btnEdit.x, btnEdit.y, buttonLength, buttonLength, textColor);
+                DrawRectangleLines(btnDarkMode.x, btnDarkMode.y, buttonLength, buttonLength, textColor);
+                DrawRectangleLines(btn3d.x, btn3d.y, buttonLength, buttonLength, textColor);
+
                 // Text in top left corner to signify edit mode
                 if (gameData->editMode) {
-                        Color textColor = getDarkModeTextColor(gameData->darkMode);
                         DrawText("EDIT", 5, 5, windowData->textSize, textColor);
                 }
 
@@ -578,7 +620,7 @@ void showInfoWindow(char *text[], int textLen, GameData *gameData, WindowConfig 
 
         int rectWidth = windowData->rectWidth;
 
-        if (IsKeyPressed(KEY_BACKSPACE))
+        if (IsKeyPressed(KEY_BACKSPACE) || IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
                 *gameState = SHOW_MAIN_MENU;
 
         BeginDrawing();
@@ -621,15 +663,27 @@ int showStartMenu(GameData *gameData, WindowConfig *windowData, int *selectedOpt
         };
         int menuOptionsLen = sizeof(menuOptions) / sizeof(menuOptions[0]);
 
+        int buttonMargin = 10;
+        int buttonLength = 50;
+
+        Rectangle btnUp = { buttonMargin + windowData->margin, gameData->screenHeight - buttonMargin * 2 - buttonLength * 2 - windowData->margin, buttonLength, buttonLength };
+        bool btnUpAction = checkButtonPressed(&btnUp);
+
+        Rectangle btnDown = { buttonMargin + windowData->margin, gameData->screenHeight - buttonMargin - buttonLength - windowData->margin, buttonLength, buttonLength };
+        bool btnDownAction = checkButtonPressed(&btnDown);
+
+        Rectangle btnEnter = { gameData->screenWidth - buttonMargin - windowData->margin - buttonLength, gameData->screenHeight - buttonMargin - buttonLength - windowData->margin, buttonLength, buttonLength };
+        bool btnEnterAction = checkButtonPressed(&btnEnter);
+
         int status = 0;
 
-        if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_K)) && *selectedOption > 0) {
+        if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_K) || btnUpAction) && *selectedOption > 0) {
                 *selectedOption -= 1;
         }
-        else if ((IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_J)) && *selectedOption < menuOptionsLen - 1) {
+        else if ((IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_J) || btnDownAction) && *selectedOption < menuOptionsLen - 1) {
                 *selectedOption += 1;
         }
-        else if (IsKeyPressed(KEY_ENTER)) {
+        else if (IsKeyPressed(KEY_ENTER) || btnEnterAction) {
                 switch (*selectedOption) {
                 case 0:
                         // Reset player position
@@ -662,6 +716,11 @@ int showStartMenu(GameData *gameData, WindowConfig *windowData, int *selectedOpt
                 Color textColor = getDarkModeTextColor(gameData->darkMode);
 
                 DrawRectangleLines(margin, margin, rectWidth, screenHeight - (margin << 1), textColor);
+
+                // Buttons
+                DrawRectangleLines(btnUp.x, btnUp.y, buttonLength, buttonLength, textColor);
+                DrawRectangleLines(btnDown.x, btnDown.y, buttonLength, buttonLength, textColor);
+                DrawRectangleLines(btnEnter.x, btnEnter.y, buttonLength, buttonLength, textColor);
 
                 int cursorPos = margin + paddingVert;
 
@@ -784,9 +843,8 @@ int main() {
 
                         if (status == -1)
                                 gameState = SHOW_MAIN_MENU;
-                        else if (status == 1) {
+                        else if (status == 1)
                                 gameState = SHOW_WIN_MENU;
-                        }
                 }
                 else if (gameState == SHOW_WIN_MENU) {
                         char *winText[] = {
